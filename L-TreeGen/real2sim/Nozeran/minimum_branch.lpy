@@ -1,0 +1,35 @@
+import random as rd
+
+stagelength = 4     # number of step between two verticille production
+nbcycle = 8         # total number of verticille branches wanted 
+radinc = 0.0005      # increment of radius through time
+taper_factor = 1.1 # rate at which the radius decreases along the branch
+
+def branch_angle(nc):         # branching angle according to position on trunk
+    return 30+ 60*((nbcycle-nc)/float(nbcycle))
+
+module A # represent trunk apical meristem
+module B # represent apical meristem of lateral branches
+module I # Internode
+
+Axiom: SectionResolution(60) A(0)
+
+derivation length: nbcycle*stagelength
+production:
+
+A(t) :
+    cyclenb = t // stagelength
+    nbaxe = rd.randint(3, 7)
+    nproduce @Gc
+    nproduce [/(360 * t / nbaxe) & (branch_angle(cyclenb)) B]
+    nproduce @Ge
+
+B --> I(0.05,0.01)B
+
+I(s,r) --> I(s,r+radinc)
+
+homomorphism:
+
+I(a,r) --> SetWidth(r)F(a, r-radinc)
+
+endlsystem

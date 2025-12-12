@@ -1,0 +1,76 @@
+### ====================================== ###
+###               Attention                ###
+### ====================================== ###
+# The overall data folder structure looks like
+# {save_folder}
+# ├── lpy
+# ├── meta
+# │   ├── json
+# │   └── npy
+# ├── new_tree
+# │   ├── {X_new_branches}
+# │   ├── new_trunk.json
+# │   ├── new_tree_tmp.json
+# │   ├── combined_normalized_branches.json
+# │   ├── lpy
+# │   ├── meta
+# │   ├── new_tree_json
+# │   └── obj
+# └── obj
+
+experiment: {
+  fusion_folder: ,
+  data_folder: demo,
+  save_folder: demo_output,
+  orchard_setup: False,  # turn on tree offset to simulate real-world orchard setup
+  ### ================= Attetion ================= ###
+  ### these two are automatically turned off at the final step (if new_tree_mode is on)
+  convert_to_m: True,  # convert the units from centimeters to meters
+  taper: True,         # taper trunk and branch to simulate decreasing thickness
+  ### ================= Attetion ================= ###
+  ### this should be turned on at the final step (moved to cml arg)
+  # new_tree_mode: True,  # data_folder will be replaced by {save_folder}/new_tree/new_tree_json
+}
+
+parameters: {
+  branch_obj: False,              # save branch obj files
+  trunk_obj: False,               # save trunk obj files
+  tree_obj: True,                 # save tree obj files
+
+  min_radius: 0.5,                # minimum radius using simple radius check cm
+  trunk_taper: -0.4,              # taper for decreasing trunk thickness (-0.4)
+  branch_taper: -0.5,             # taper for decreasing branch thickness (-0.5)
+  
+  num_new_trees: 10,              # #new trees
+  
+  # New Branch Generation
+  num_pts_spline: 100,            # #points sampled from the spline
+  num_new_branches: 60,          # #new branches (This determines how many branch candidates would be generated)
+  num_closest_branch1: 5,        # #branches for interpolation
+  num_closest_branch2: 2,        # #branches for interpolation (Tune this rather than the above one!!)
+  radius_perturb_range: [-0.003, 0.001],   # perturbation range added to interpolated branch radius
+  length_scale_range: [1.5, 1.8],  # length scale range added to interpolated branch length
+  max_branch_tail_radius: [0.001, 0.004],  # Maximum radius for tapering the branch radii
+
+  # New Tree Generation
+  num_src_trunk: 3,               # #trunks for interpolation
+  max_trunk_tail_radius: [0.001, 0.004],   # Maximum radius for tapering the trunk radii
+  num_branch_range: [15, 30],     # #branches attached to trunks (Needs to < num_new_branches)
+  num_trial: 2,                   # #tries to rotate the branch to avoid collision
+  branch_level: 1,                # 1 means to add 2nd branch to primary branch, so forth
+  top_k: 10,                          # Top K least similar branches in terms of orientation
+
+  #####################
+  # The following three parameters should have the same len() that is equal to branch_level
+  #####################
+  prob_add_branch: [0.7],      # probability to attach new branches
+  r_scales: [[0.5, 0.7]],             # radius scale range for new branches (scale is w.r.t parent branch)
+  s_scales: [[0.3, 0.5]],             # size scale range for new branches (scale is w.r.t parent branch)
+#   prob_add_branch: [0.7, 0.5],      # probability to attach new branches
+#   r_scales: [[0.3, 0.5], [0.5, 0.8]],             # radius scale range for new branches (scale is w.r.t parent branch)
+#   s_scales: [[0.3, 0.5], [0.5, 0.8]],             # size scale range for new branches (scale is w.r.t parent branch)
+  
+  new_origin_index_range: [30, 60], # range for the new origin of the child branch
+
+  process_mode: single  # single or parallel for branch collision detection
+}

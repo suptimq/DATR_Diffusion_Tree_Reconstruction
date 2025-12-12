@@ -1,0 +1,24 @@
+name: l_treegen
+channels:
+  - fredboudon
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.9
+  - openalea.lpy
+  - gdal
+  - polyscope
+  - matplotlib
+  - geopandas
+  - numpy<2
+  - xmlschema
+  - scipy
+  - scikit-learn
+  - natsort
+  - pyyaml
+  - pip
+  - pip:
+      - open3d
+      - trimesh
+      - laspy

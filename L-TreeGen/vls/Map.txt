@@ -1,0 +1,6 @@
+1: tree1_trunk
+2: tree1_branch5
+3: tree1_branch2
+4: tree1_branch4
+5: tree1_branch1
+6: tree1_branch3
