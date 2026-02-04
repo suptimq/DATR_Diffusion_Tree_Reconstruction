@@ -129,6 +129,48 @@ def generate_lpy_content_with_leaves(modules, points_list, radii_list, leaf_data
     return content
 
 
+def generate_leaf_only_lpy_content(module_name, leaf_data_list):
+    """
+    Generates L-system content with ONLY leaves (no branch geometry).
+
+    Args:
+        module_name (str): Name for the leaf module (e.g., "Leaf1")
+        leaf_data_list (list): List of leaf data dicts with:
+            - 'position': [x,y,z]
+            - 'pitch_angle': float (degrees)
+            - 'rotation_angle': float (degrees)
+            - 'size': float (leaf length)
+
+    Returns:
+        str: L-system content with only leaf geometry
+    """
+    content = f"module {module_name}\n"
+    content += f"Axiom: {module_name}()\n"
+    content += "derivation length: 1\n"
+    content += "production:\n"
+    content += f"\n{module_name}():\n"
+
+    # Generate leaves without any branch geometry
+    for leaf in leaf_data_list:
+        pos = leaf['position']
+        pitch = leaf['pitch_angle']
+        rotation = leaf['rotation_angle']
+        size = leaf['size']
+        content += f"""    nproduce [
+    nproduce MoveTo({pos[0]}, {pos[1]}, {pos[2]})
+    nproduce ;(2)
+    nproduce ^({pitch})
+    nproduce +({rotation})
+    nproduce ~l({size})
+    nproduce ]
+"""
+
+    content += "interpretation:\n"
+    content += "endlsystem"
+
+    return content
+
+
 # Function to process Lpy files
 def process_lpy_files(input_directory, output_directory):
     lpy_files = [f for f in os.listdir(input_directory) if f.endswith(".lpy")]

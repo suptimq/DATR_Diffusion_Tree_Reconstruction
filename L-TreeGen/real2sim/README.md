@@ -1,139 +1,319 @@
 # Real2Sim Apple Tree Generator
 
-##  Requirements
+Procedural generation system for synthetic apple tree models with realistic branch structures and foliage. Generates 3D meshes (OBJ format) using L-systems (L-Py) with support for hierarchical branching, tapering, and leaf generation.
 
-See requirements in `setup_env.sh`.
+## Requirements
 
-## Config File
-
-All configuration parameters should be defined in a **yaml** file saved in the `config` folder.
-
-## Data Description
-
-A brief description for data in `json` files, for example, `demo/tree1.json`.
-
-- trunk_radius: `float` = Tree trunk radius
-- trunk_points: `List[List]` = Tree trunk key points
-- branch_internode_ratio: `List` = Ratio of branch origin to root trunk
-- branch_points: `List[List[List]]` = Branch key points
-- branch_points_radius: `List[List]` = Radius of each branch key point
-
-## Run
+Install dependencies using the provided setup script:
 
 ```bash
+bash setup_env.sh
+```
+
+**Key Dependencies:**
+- Python 3.7+
+- OpenAlea L-Py (L-system Python library)
+- NumPy, Matplotlib
+- PyYAML for configuration
+
+See complete requirements in `setup_env.sh`.
+
+## Configuration
+
+All pipeline parameters are defined in `Config/config.yaml`. The config file controls:
+
+- **Output settings**: OBJ file generation, unit conversion (cm ↔ m), tapering
+- **Branch generation**: Number of trees, branch counts, interpolation settings
+- **Leaf generation**: Density, size, orientation, phyllotaxis patterns
+- **Collision detection**: Mode (single/parallel), branch overlap handling
+
+Example configuration:
+
+```yaml
+experiment:
+  convert_to_m: True          # Convert units from cm to meters
+  taper: True                 # Apply tapering to branches and trunk
+
+parameters:
+  num_new_trees: 10           # Number of trees to generate
+  branch_obj: True            # Save individual branch OBJ files
+  leaf_generation: True       # Enable procedural leaf generation
+  leaf_density: [0.3, 0.2, 0.1]  # Leaves per cm for levels 1,2,3+
+```
+
+## Input Data Format
+
+Tree structure data is stored in JSON files (e.g., `demo/tree1.json`). Each file contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `trunk_radius` | `float` | Base radius of tree trunk (cm) |
+| `trunk_points` | `List[List[float]]` | 3D skeleton points defining trunk centerline `[[x,y,z], ...]` |
+| `branch_internode_ratio` | `List[float]` | Position ratios (0-1) where branches attach to trunk |
+| `branch_points` | `List[List[List[float]]]` | 3D skeleton points for each branch `[[[x,y,z], ...], ...]` |
+| `branch_points_radius` | `List[List[float]]` | Radius at each point along branches `[[r1, r2, ...], ...]` |
+
+**Example:**
+```json
+{
+  "trunk_radius": 5.2,
+  "trunk_points": [[0, 0, 0], [0, 0, 10], [0, 0, 20]],
+  "branch_internode_ratio": [0.3, 0.5, 0.7],
+  "branch_points": [
+    [[0, 0, 6], [2, 0, 8], [4, 0, 10]],
+    [[0, 0, 10], [0, 3, 12], [0, 5, 14]]
+  ],
+  "branch_points_radius": [
+    [2.0, 1.5, 1.0],
+    [1.8, 1.3, 0.8]
+  ]
+}
+```
+
+## Quick Start
+
+```bash
+# Run the basic pipeline
 ./run.sh
+
+# OR generate new trees with interpolation
+python MeshGenerator.py -new_tree_mode
 ```
 
 ## MeshGenerator
 
-This script is designed to process data related to tree structures, generating three directories (i.e., `meta`, `lpy`, and `obj`). The `lpy` folder saves the **.lpy** files as intermedia files to produce the tree meshes as **obj** files saved in `obj` folder. The `meta` folder contains a `json` and a `npy` folder. The `npy` folder has the individual branch meta information (e.g., ***branch_points***) for the training of completion models. The `json` folder has the combined trunk/branch meta information for the generation of new trees.
+Converts tree structure data (JSON) into 3D mesh files (OBJ) using L-system generation. The pipeline creates three main output directories:
 
-### Output Folder Structure
+- **`lpy/`**: L-system files (.lpy) - intermediate representation used to generate meshes
+- **`obj/`**: 3D mesh files (.obj) - final geometric output for rendering/simulation
+- **`meta/`**: Metadata for training and tree generation
+  - `meta/json/`: Combined trunk+branch data for new tree generation
+  - `meta/npy/`: Individual branch metadata for completion model training
+
+### Basic Output Structure
 
 ```
-{save_folder}
-├── lpy
-├── meta
-│   ├── json
-│   └── npy
-└── obj
+{save_folder}/
+├── lpy/           # L-system intermediate files
+├── meta/
+│   ├── json/      # Combined metadata
+│   └── npy/       # Individual branch data
+└── obj/           # 3D mesh outputs
 ```
 
-**THIS IS IMPORTANT!!**
-
-Run `MeshGenerator.py` to produce mesh objects of new trees while setting the `-new_tree_mode` in the command line.
+**IMPORTANT**: Run with `-new_tree_mode` flag to generate interpolated trees:
 
 ```shell
 python MeshGenerator.py -new_tree_mode
 ```
 
+### Leaf Generation
+
+The MeshGenerator supports procedural leaf generation using L-Py's built-in leaf primitives. Leaves are automatically generated on branches using phyllotaxis patterns (golden angle spiral).
+
+#### Configuration Parameters
+
+All leaf generation parameters are defined in `Config/config.yaml`:
+
+```yaml
+parameters:
+  # Leaf Generation Parameters
+  leaf_generation: True              # Master toggle for leaf generation
+  leaf_density: [0.3, 0.2, 0.1]     # Leaves per cm for branch levels 1,2,3+
+                                     # Auto-converts to leaves/m if convert_to_m: True
+  leaf_size: [15, 8, 6]             # Leaf length in cm for branch levels 1,2,3+
+                                     # Auto-converts to m if convert_to_m: True
+  leaf_width_ratio: 0.6              # Width/length ratio (oval shape)
+  leaf_orientation_angle: [45, 75]   # Angle range from branch axis (degrees)
+  leaf_phyllotaxis_angle: 137.5      # Spiral angle between leaves (golden angle)
+  leaf_start_ratio: 0.1              # Skip first 10% of branch (near trunk)
+  leaf_end_ratio: 0.95               # Stop at 95% of branch (before tip)
+  leaf_obj: True                     # Save individual leaf OBJ files
+```
+
+#### Key Features
+
+- **Automatic Unit Conversion**: Leaf density and size automatically convert between cm and meters based on `convert_to_m` setting
+- **Multi-Level Support**: Different leaf parameters for primary branches, secondary branches, and tertiary branches
+- **Phyllotaxis Pattern**: Natural spiral leaf arrangement using the golden angle (137.5°)
+- **Green Color**: Leaves are rendered in green using L-Py color commands
+- **Separate OBJ Files**:
+  - Branch OBJ files contain **only** branch geometry
+  - Leaf OBJ files contain **only** leaf geometry
+  - Tree OBJ files contain complete tree (branches + leaves)
+
+#### Output Structure with Leaves
+
+When `leaf_generation: True` and `leaf_obj: True`:
+
+```
+demo_output/
+└── obj/
+    └── new_tree_json/
+        └── tree1/
+            ├── branch/
+            │   ├── tree1_branch1.obj           # Only branch geometry
+            │   ├── tree1_branch2.obj
+            │   └── tree1_level2_branch1.obj    # Hierarchical branches
+            ├── leaf/
+            │   ├── tree1_leaf1.obj             # Only leaf geometry
+            │   ├── tree1_leaf2.obj
+            │   └── tree1_level2_leaf1.obj      # Hierarchical branch leaves
+            └── tree1.obj                        # Complete tree (branches + leaves)
+```
+
+#### Technical Details
+
+- **Module**: `leaf_generator.py` contains core leaf generation logic
+- **L-Py Integration**: Uses L-Py's `~l()` leaf primitive with orientation commands (`^`, `+`)
+- **Leaf Selection**: Evenly-spaced bud point selection along branch arc length
+- **Unit Conversion Formula**:
+  - Density: `leaves/cm × 100 = leaves/m` when `convert_to_m: True`
+  - Size: `cm ÷ 100 = m` when `convert_to_m: True`
+
 ## NewBranchGenerator
 
-This script generates new branches by interpolating from existing branches.
+Generates novel branch structures by interpolating between existing branches from real tree data.
 
 ### BranchNormalizer
 
-It processes JSON files containing path groups (i.e.,branch meta data). It normalizes each path group by translating it to have its first point at the origin `[0, 0, 0]` and rotating it so that the last point aligns with the target vector `[1, 1, 1]`. It produces a new `new_tree` folder containing the combined normalized branch meta infomration.
+Normalizes branch geometry for interpolation:
+
+1. **Translation**: Moves first point to origin `[0, 0, 0]`
+2. **Rotation**: Aligns last point with target vector `[1, 1, 1]`
+3. **Output**: Creates `new_tree/` folder with normalized branch metadata
+
+This normalization ensures consistent orientation and scale for interpolation.
 
 ### BranchInterpolator
 
-It generates new branches based on the existing branches by interpolating from randomly selected branches and saves the new branch data as JSON files.
+Creates synthetic branches by interpolating between randomly selected normalized branches:
+
+- Samples K nearest branches based on geometric similarity
+- Interpolates control points and radii
+- Applies length/radius scaling variations
+- Saves interpolated branches as JSON files
+
+**Configuration**: Set `num_new_branches` and `num_closest_branch2` in `config.yaml`
 
 ### Output Folder Structure
 
 ```
-{save_folder}
-├── ...
-├── interpolation_num-new-tree-X
-│   ├── Y_new_branches
-│   │   ├── tree1 (Containing Y branch candidates for tree1)
-│   │   ├── tree2
-│   │   ├── ...
-│   │   └── treeX
-│   └── combined_normalized_branches.json
+{save_folder}/
+└── interpolation_num-new-tree-X/
+    ├── Y_new_branches/
+    │   ├── tree1/              # Branch candidates for tree1
+    │   ├── tree2/
+    │   └── treeX/
+    └── combined_normalized_branches.json
 ```
 
 ## NewTreeGenerator
 
-This script generates a new trunk based on a selection of existing trunks from a JSON file, interpolates branch internode ratios, and optionally adds branches to the new trunk. It combines data from multiple trunks, such as their points, radii, and branch internode ratios, to create a new trunk with a unique structure. The branches are added based on the internode ratios and the positions on the trunk.
+Assembles complete tree models by combining interpolated trunks with generated branches.
 
-### BranchCleaner 
+**Pipeline:**
+1. **Trunk Generation**: Interpolates new trunks from existing trunk data
+2. **Branch Placement**: Attaches branches at interpolated internode positions
+3. **Hierarchy Building**: Adds secondary/tertiary branches (configurable depth)
+4. **Collision Removal**: Eliminates overlapping branches using spatial checks
 
-It removes overlapping branches from a JSON file that contains branch points and their radii. It calculates the distance between points on different branches to determine overlap based on their radii. If an overlap is detected, the overlapping branch with higer position in the list is removed from the output.
+### BranchCleaner
 
-### Output Folder Structure
+Removes branch collisions using geometric overlap detection:
 
-```
-{save_folder}
-├── ...
-├── interpolation_num-new-tree-X
-│   ├── Y_new_branches
-│   │   ├── new_tree_tmp.json
-│   │   ├── trunk1.json
-│   │   ├── trunk2.json
-│   │   ├── ...
-│   │   └── trunkX.json
-│   └── new_tree_json
-│       ├── tree1.json
-│       ├── tree2.json
-│       ├── ...
-│       └── treeX.json
-└── ...
-```
+- Calculates point-to-point distances between all branch pairs
+- Detects overlap when distance < sum of branch radii at those points
+- Removes higher-indexed branch when overlap is detected
+- **Special handling**: Skips first 10 skeleton points to preserve trunk-branch connections
 
-### Output Folder Structure
+### Complete Pipeline Output Structure
+
+After running the full generation pipeline (`python MeshGenerator.py -new_tree_mode`):
 
 ```
-{save_folder}
-├── ...
-├── interpolation_num-new-tree-X
-│   ├── Y_new_branches
-│   ├── combined_normalized_branches.json
-│   ├── lpy
-│   ├── meta
-│   ├── new_tree_json
-│   └── obj
-└── ...
+{save_folder}/
+└── interpolation_num-new-tree-X/
+    ├── Y_new_branches/
+    │   ├── combined_normalized_branches.json    # All normalized branches
+    │   ├── tree1/                               # Branch candidates per tree
+    │   ├── tree2/
+    │   └── treeX/
+    ├── new_tree_json/                           # Complete tree definitions
+    │   ├── tree1.json
+    │   ├── tree2.json
+    │   └── treeX.json
+    ├── lpy/                                     # L-system intermediate files
+    │   └── new_tree_json/
+    │       └── tree1/
+    │           ├── branch/                      # Branch .lpy files
+    │           ├── leaf/                        # Leaf .lpy files
+    │           ├── trunk/                       # Trunk .lpy files
+    │           └── tree1.lpy                    # Complete tree L-system
+    ├── meta/                                    # Metadata
+    │   ├── json/                                # Combined trunk+branch data
+    │   └── npy/                                 # Individual branch data
+    └── obj/                                     # 3D mesh outputs
+        └── new_tree_json/
+            └── tree1/
+                ├── branch/                      # Individual branch meshes
+                ├── leaf/                        # Individual leaf meshes
+                ├── trunk/                       # Trunk mesh
+                └── tree1.obj                    # Complete tree mesh
 ```
 
-## Others 
+## Utilities
 
-### Tree Visualizataion
+### Tree Visualization
 
-Run `TreeVisualizer.py` to plot out trees saved in **obj** format. Notice it is pretty slow when loading 10 trees.
+Visualize generated tree meshes using the built-in visualizer:
+
+```bash
+python TreeVisualizer.py
+```
+
+**Note**: Loading 10+ trees can be slow due to mesh complexity.
 
 ### Coordinate System Transform
 
-Run `align_coor2blender.py` to transform to Blender's coordinate system for rendering.
+Convert to Blender's coordinate system for rendering:
 
-## Constraints
+```bash
+python align_coor2blender.py
+```
 
-1. Generated branches should have two tapers: 1) taper along the its own growing direction and 2) taper from bottom to top (trunk growing direction). This is achieved by setting the **decrease_factor** and the **taper_radius** function in `generate_new_branch`.
+This transforms the Y-up coordinate system to Z-up for Blender compatibility.
 
-2. Generated trunkes should have the second taper property as implemented in `generate_new_trunk`.
+## Implementation Constraints
 
-3. The branches added to the particular height of the trunk should have a radius that is smaller than the cross-section of the trunk. This prevents giant branches at the top of the tree in `add_branches_to_trunk`.
+The tree generator enforces several botanical and geometric constraints:
 
-4. The children branches added to the parent branches should grow towards the same side of the tree and the length/radius of the children branches should be smaller than those of the parent branches in `add_branches`. (This is still buggy - could be `compute_branch_direction`)
+1. **Dual Tapering**: Branches taper in two dimensions:
+   - Along their own growing direction (natural decrease)
+   - From base to apex following trunk height
+   - Implemented via `taper_radius()` function in `generate_new_branch()`
 
-5. The collision check is conducted between (each level branches, primary branches). A hacky solution is used to detect the collision between a child branch and its parent branch where the first 10 skeleton points were skipped in `remove_collision` and `remove_overlapping_branches`.
+2. **Trunk Tapering**: Trunk radius decreases from base to apex
+   - Implemented in `generate_new_trunk()`
+
+3. **Radius Constraints**: Branch radius at attachment point must be smaller than trunk cross-section at that height
+   - Prevents unrealistic thick branches at tree apex
+   - Enforced in `add_branches_to_trunk()`
+
+4. **Hierarchical Growth**: Child branches follow parent branch orientation
+   - Children grow toward same side as parent
+   - Child length/radius smaller than parent
+   - Implemented in `add_branches()` (note: `compute_branch_direction()` has known issues)
+
+5. **Collision Detection**: Multi-level collision checking
+   - Checks between: (each-level branches, primary branches)
+   - Skips first 10 skeleton points for parent-child connections
+   - Implemented in `remove_collision()` and `remove_overlapping_branches()`
+
+## Contributing
+
+When modifying the generator, preserve these botanical constraints to maintain realistic tree structures.
+
+## License
+
+See LICENSE file for details.
