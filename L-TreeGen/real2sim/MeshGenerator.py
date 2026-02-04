@@ -9,6 +9,7 @@ from natsort import natsorted
 from utils import load_config, taper_radius
 from utils import interpolate_points, interpolate_radii, calculate_direction_vectors
 from lpy_utils import *
+from leaf_generator import process_branch_leaves
 
 
 # Load configuration from YAML file
@@ -95,6 +96,7 @@ for root, dirs, files in os.walk(data_folder):
             tree_lpy_modules = []
             tree_lpy_points = []
             tree_lpy_radii = []
+            tree_lpy_leaf_data = []
 
             # Calculate paths
             row = os.path.basename(root)
@@ -204,6 +206,7 @@ for root, dirs, files in os.walk(data_folder):
             tree_lpy_modules.append("T")
             tree_lpy_points.append(data["trunk_points"])
             tree_lpy_radii.append(data["trunk_radius"])
+            tree_lpy_leaf_data.append(None)  # Trunk has no leaves
 
             # Initialize empty lists for branch skeleton points, radii, and directions
             all_branch_skeleton_pts = []
@@ -247,6 +250,20 @@ for root, dirs, files in os.walk(data_folder):
                     "center_radii": interpolated_branch_radii,
                     "center_directions": branch_point_directions,
                 }
+
+                # Generate leaves for this branch
+                if config["parameters"].get("leaf_generation", False):
+                    leaf_data = process_branch_leaves(
+                        interpolated_branch_points,
+                        branch_point_directions,
+                        branch_level=1,
+                        config=config
+                    )
+                    branch_skeleton_dict["leaf_data"] = leaf_data
+                    tree_lpy_leaf_data.append(leaf_data)
+                else:
+                    branch_skeleton_dict["leaf_data"] = None
+                    tree_lpy_leaf_data.append(None)
 
                 if branch_obj:
                     # Save branch data to .npz file for compatibility
@@ -318,6 +335,20 @@ for root, dirs, files in os.walk(data_folder):
                         "center_directions": branch_point_directions,
                     }
 
+                    # Generate leaves for this hierarchical branch
+                    if config["parameters"].get("leaf_generation", False):
+                        leaf_data = process_branch_leaves(
+                            interpolated_branch_points,
+                            branch_point_directions,
+                            branch_level=level+1,
+                            config=config
+                        )
+                        secondary_branch_skeleton_dict["leaf_data"] = leaf_data
+                        tree_lpy_leaf_data.append(leaf_data)
+                    else:
+                        secondary_branch_skeleton_dict["leaf_data"] = None
+                        tree_lpy_leaf_data.append(None)
+
                     if branch_obj:
                         # Save branch data to .npz file for compatibility
                         branch_npz_filepath = os.path.join(
@@ -340,9 +371,14 @@ for root, dirs, files in os.walk(data_folder):
                 process_lpy_files(lpy_branch_dir, obj_branch_dir)
 
             # Write tree Lpy file and generate tree-level .obj file if specified
-            tree_content = generate_lpy_content(
-                tree_lpy_modules, tree_lpy_points, tree_lpy_radii
-            )
+            if config["parameters"].get("leaf_generation", False) and any(tree_lpy_leaf_data):
+                tree_content = generate_lpy_content_with_leaves(
+                    tree_lpy_modules, tree_lpy_points, tree_lpy_radii, tree_lpy_leaf_data
+                )
+            else:
+                tree_content = generate_lpy_content(
+                    tree_lpy_modules, tree_lpy_points, tree_lpy_radii
+                )
             tree_file_name = f"{tree_id}.lpy"
 
             with open(os.path.join(lpy_tree_dir, tree_file_name), "w") as file:

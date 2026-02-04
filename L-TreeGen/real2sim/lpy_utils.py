@@ -54,6 +54,81 @@ def generate_lpy_content(modules, points_list, radii_list):
     return content
 
 
+def generate_lpy_content_with_leaves(modules, points_list, radii_list, leaf_data_list=None):
+    """
+    Generates L-system content with leaf support using L-Py's built-in leaf primitives.
+    Reference: https://lpy.readthedocs.io/en/latest/index.html
+
+    Args:
+        modules (list): A list of L-system module names.
+        points_list (list): A list of lists of 3D points representing each structure.
+        radii_list (list): A list of lists of radii corresponding to each point.
+        leaf_data_list (list, optional): List of leaf data lists for each module. Each leaf has:
+            - 'position': [x,y,z]
+            - 'pitch_angle': float (degrees, for ^ command)
+            - 'rotation_angle': float (degrees, for + command)
+            - 'size': float (leaf length)
+
+    Returns:
+        str: Generated L-system content with leaves.
+    """
+    # Join module names with a space
+    module_line = "module " + ", ".join(modules)
+
+    content = f"{module_line}\n"
+
+    # Join module names with their corresponding SectionResolution commands
+    axiom_line = "Axiom: " + " ".join(
+        [f"SectionResolution(30) {module}()" for module in modules]
+    )
+
+    content += f"{axiom_line}\n"
+    content += "derivation length: 1\n"
+    content += "production:\n"
+
+    # Iterate over modules, points, radii, and optional leaf data
+    for idx, (module, points, radii) in enumerate(zip(modules, points_list, radii_list)):
+        # Get leaf data for this module (if available)
+        leaf_data = []
+        if leaf_data_list and idx < len(leaf_data_list) and leaf_data_list[idx]:
+            leaf_data = leaf_data_list[idx]
+
+        # Generate branch content
+        content += f"""
+{module}():
+    x, y, z = {points[0]}
+    r = {radii[0]}
+    nproduce !(r) MoveTo(x, y, z)
+    nproduce @Gc
+    for point, radius in zip({points[1:]}, {radii[1:]}):
+        x, y, z = point
+        nproduce !(radius) LineTo(x, y, z)
+    nproduce @Ge
+"""
+
+        # Add leaves if available
+        if leaf_data:
+            # Generate individual nproduce statements for each leaf to avoid L-Py parser warnings
+            for leaf in leaf_data:
+                pos = leaf['position']
+                pitch = leaf['pitch_angle']
+                rotation = leaf['rotation_angle']
+                size = leaf['size']
+                content += f"""    nproduce [
+    nproduce MoveTo({pos[0]}, {pos[1]}, {pos[2]})
+    nproduce ;(2)
+    nproduce ^({pitch})
+    nproduce +({rotation})
+    nproduce ~l({size})
+    nproduce ]
+"""
+
+    content += "interpretation:\n"
+    content += "endlsystem"
+
+    return content
+
+
 # Function to process Lpy files
 def process_lpy_files(input_directory, output_directory):
     lpy_files = [f for f in os.listdir(input_directory) if f.endswith(".lpy")]

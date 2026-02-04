@@ -72,5 +72,16 @@ parameters: {
   
   new_origin_index_range: [30, 60], # range for the new origin of the child branch
 
-  process_mode: single  # single or parallel for branch collision detection
+  process_mode: single,  # single or parallel for branch collision detection
+
+  # Leaf Generation Parameters
+  leaf_generation: True,             # Master toggle for leaf generation
+  leaf_density: [0.15, 0.20, 0.10],  # Leaves per cm for levels 1,2,3+ (auto-converts to leaves/m if convert_to_m=True)
+  leaf_size: [10, 8, 6],             # Leaf length in cm for levels 1,2,3+ (auto-converts to m if convert_to_m=True)
+  leaf_width_ratio: 0.6,             # Width/length ratio (oval shape)
+  leaf_orientation_angle: [45, 75],  # Angle range from branch axis (degrees)
+  leaf_phyllotaxis_angle: 137.5,     # Spiral angle between leaves (golden angle)
+  leaf_start_ratio: 0.1,             # Skip first 10% of branch (near trunk)
+  leaf_end_ratio: 0.95,              # Stop at 95% of branch (before tip)
+  leaf_obj: False,                   # Save individual leaf OBJ files (debug)
 }
