@@ -10,6 +10,7 @@ from utils import load_config, taper_radius
 from utils import interpolate_points, interpolate_radii, calculate_direction_vectors
 from lpy_utils import *
 from leaf_generator import process_branch_leaves
+from fruit_generator import process_branch_fruits
 
 
 # Load configuration from YAML file
@@ -97,6 +98,7 @@ for root, dirs, files in os.walk(data_folder):
             tree_lpy_points = []
             tree_lpy_radii = []
             tree_lpy_leaf_data = []
+            tree_lpy_fruit_data = []
 
             # Calculate paths
             row = os.path.basename(root)
@@ -110,16 +112,20 @@ for root, dirs, files in os.walk(data_folder):
             lpy_trunk_dir = os.path.join(lpy_tree_dir, "trunk")
             lpy_branch_dir = os.path.join(lpy_tree_dir, "branch")
             lpy_leaf_dir = os.path.join(lpy_tree_dir, "leaf")
+            lpy_fruit_dir = os.path.join(lpy_tree_dir, "fruit")
             obj_leaf_dir = os.path.join(obj_row_dir, tree_id, "leaf")
+            obj_fruit_dir = os.path.join(obj_row_dir, tree_id, "fruit")
 
             # Create directories if they don't exist
             for directory in [
                 obj_trunk_dir,
                 obj_branch_dir,
                 obj_leaf_dir,
+                obj_fruit_dir,
                 lpy_trunk_dir,
                 lpy_branch_dir,
                 lpy_leaf_dir,
+                lpy_fruit_dir,
             ]:
                 os.makedirs(directory, exist_ok=True)
 
@@ -258,6 +264,21 @@ for root, dirs, files in os.walk(data_folder):
                     branch_skeleton_dict["leaf_data"] = None
                     tree_lpy_leaf_data.append(None)
 
+                # Generate fruits for this branch
+                fruit_data = None
+                if config["parameters"].get("fruit_generation", False):
+                    fruit_data = process_branch_fruits(
+                        interpolated_branch_points,
+                        branch_point_directions,
+                        branch_level=1,
+                        config=config
+                    )
+                    branch_skeleton_dict["fruit_data"] = fruit_data
+                    tree_lpy_fruit_data.append(fruit_data)
+                else:
+                    branch_skeleton_dict["fruit_data"] = None
+                    tree_lpy_fruit_data.append(None)
+
                 # Generate L-Py content WITHOUT leaves for individual branch files
                 # (Leaves are only included in the tree-level file)
                 branch_content = generate_lpy_content(
@@ -283,6 +304,16 @@ for root, dirs, files in os.walk(data_folder):
                     leaf_file_name = f"{tree_id}_leaf{branch_idx+1}.lpy"
                     with open(os.path.join(lpy_leaf_dir, leaf_file_name), "w") as file:
                         file.write(leaf_only_content)
+
+                # Save fruit-only L-Py file if fruits exist and fruit_obj is enabled
+                if fruit_data and config["parameters"].get("fruit_obj", False):
+                    # Generate fruit-only content without any branch geometry
+                    fruit_only_content = generate_fruit_only_lpy_content(
+                        f"F{branch_idx+1}", fruit_data
+                    )
+                    fruit_file_name = f"{tree_id}_fruit{branch_idx+1}.lpy"
+                    with open(os.path.join(lpy_fruit_dir, fruit_file_name), "w") as file:
+                        file.write(fruit_only_content)
 
                 if branch_obj:
                     # Save branch data to .npz file for compatibility
@@ -353,6 +384,21 @@ for root, dirs, files in os.walk(data_folder):
                         secondary_branch_skeleton_dict["leaf_data"] = None
                         tree_lpy_leaf_data.append(None)
 
+                    # Generate fruits for this hierarchical branch
+                    fruit_data = None
+                    if config["parameters"].get("fruit_generation", False):
+                        fruit_data = process_branch_fruits(
+                            interpolated_branch_points,
+                            branch_point_directions,
+                            branch_level=level+1,
+                            config=config
+                        )
+                        secondary_branch_skeleton_dict["fruit_data"] = fruit_data
+                        tree_lpy_fruit_data.append(fruit_data)
+                    else:
+                        secondary_branch_skeleton_dict["fruit_data"] = None
+                        tree_lpy_fruit_data.append(None)
+
                     # Generate L-Py content WITHOUT leaves for individual branch files
                     # (Leaves are only included in the tree-level file)
                     branch_content = generate_lpy_content(
@@ -383,6 +429,16 @@ for root, dirs, files in os.walk(data_folder):
                         with open(os.path.join(lpy_leaf_dir, leaf_file_name), "w") as file:
                             file.write(leaf_only_content)
 
+                    # Save fruit-only L-Py file if fruits exist and fruit_obj is enabled
+                    if fruit_data and config["parameters"].get("fruit_obj", False):
+                        # Generate fruit-only content without any branch geometry
+                        fruit_only_content = generate_fruit_only_lpy_content(
+                            f"F{level+1}{branch_idx+1}", fruit_data
+                        )
+                        fruit_file_name = f"{tree_id}_level{level+1}_fruit{branch_idx+1}.lpy"
+                        with open(os.path.join(lpy_fruit_dir, fruit_file_name), "w") as file:
+                            file.write(fruit_only_content)
+
                     if branch_obj:
                         # Save branch data to .npz file for compatibility
                         branch_npz_filepath = os.path.join(
@@ -405,13 +461,25 @@ for root, dirs, files in os.walk(data_folder):
                 process_lpy_files(lpy_branch_dir, obj_branch_dir)
             if config["parameters"].get("leaf_obj", False):
                 process_lpy_files(lpy_leaf_dir, obj_leaf_dir)
+            if config["parameters"].get("fruit_obj", False):
+                process_lpy_files(lpy_fruit_dir, obj_fruit_dir)
 
             # Write tree Lpy file and generate tree-level .obj file if specified
-            if config["parameters"].get("leaf_generation", False) and any(tree_lpy_leaf_data):
+            has_leaves = config["parameters"].get("leaf_generation", False) and any(tree_lpy_leaf_data)
+            has_fruits = config["parameters"].get("fruit_generation", False) and any(tree_lpy_fruit_data)
+
+            if has_leaves and has_fruits:
+                # Include both leaves and fruits
+                tree_content = generate_lpy_content_with_leaves_and_fruits(
+                    tree_lpy_modules, tree_lpy_points, tree_lpy_radii, tree_lpy_leaf_data, tree_lpy_fruit_data
+                )
+            elif has_leaves:
+                # Include only leaves
                 tree_content = generate_lpy_content_with_leaves(
                     tree_lpy_modules, tree_lpy_points, tree_lpy_radii, tree_lpy_leaf_data
                 )
             else:
+                # No leaves or fruits
                 tree_content = generate_lpy_content(
                     tree_lpy_modules, tree_lpy_points, tree_lpy_radii
                 )

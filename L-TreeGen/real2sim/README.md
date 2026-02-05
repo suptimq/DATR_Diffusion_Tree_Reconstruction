@@ -2,6 +2,8 @@
 
 Procedural generation system for synthetic apple tree models with realistic branch structures and foliage. Generates 3D meshes (OBJ format) using L-systems (L-Py) with support for hierarchical branching, tapering, and leaf generation.
 
+![Synthetic Apple Tree](cover/image.png)
+
 ## Requirements
 
 Install dependencies using the provided setup script:
@@ -84,11 +86,11 @@ python MeshGenerator.py -new_tree_mode
 
 Converts tree structure data (JSON) into 3D mesh files (OBJ) using L-system generation. The pipeline creates three main output directories:
 
-- **`lpy/`**: L-system files (.lpy) - intermediate representation used to generate meshes
-- **`obj/`**: 3D mesh files (.obj) - final geometric output for rendering/simulation
-- **`meta/`**: Metadata for training and tree generation
-  - `meta/json/`: Combined trunk+branch data for new tree generation
-  - `meta/npy/`: Individual branch metadata for completion model training
+- **`lpy`**: L-system files (.lpy) - intermediate representation used to generate meshes
+- **`obj`**: 3D mesh files (.obj) - final geometric output for rendering/simulation
+- **`meta`**: Metadata for training and tree generation
+  - `meta/json`: Combined trunk+branch data for new tree generation
+  - `meta/npy`: Individual branch metadata for completion model training
 
 ### Basic Output Structure
 
@@ -131,45 +133,48 @@ parameters:
   leaf_obj: True                     # Save individual leaf OBJ files
 ```
 
-#### Key Features
-
-- **Automatic Unit Conversion**: Leaf density and size automatically convert between cm and meters based on `convert_to_m` setting
-- **Multi-Level Support**: Different leaf parameters for primary branches, secondary branches, and tertiary branches
-- **Phyllotaxis Pattern**: Natural spiral leaf arrangement using the golden angle (137.5°)
-- **Green Color**: Leaves are rendered in green using L-Py color commands
-- **Separate OBJ Files**:
-  - Branch OBJ files contain **only** branch geometry
-  - Leaf OBJ files contain **only** leaf geometry
-  - Tree OBJ files contain complete tree (branches + leaves)
-
-#### Output Structure with Leaves
-
-When `leaf_generation: True` and `leaf_obj: True`:
-
-```
-demo_output/
-└── obj/
-    └── new_tree_json/
-        └── tree1/
-            ├── branch/
-            │   ├── tree1_branch1.obj           # Only branch geometry
-            │   ├── tree1_branch2.obj
-            │   └── tree1_level2_branch1.obj    # Hierarchical branches
-            ├── leaf/
-            │   ├── tree1_leaf1.obj             # Only leaf geometry
-            │   ├── tree1_leaf2.obj
-            │   └── tree1_level2_leaf1.obj      # Hierarchical branch leaves
-            └── tree1.obj                        # Complete tree (branches + leaves)
-```
 
 #### Technical Details
 
 - **Module**: `leaf_generator.py` contains core leaf generation logic
 - **L-Py Integration**: Uses L-Py's `~l()` leaf primitive with orientation commands (`^`, `+`)
 - **Leaf Selection**: Evenly-spaced bud point selection along branch arc length
-- **Unit Conversion Formula**:
-  - Density: `leaves/cm × 100 = leaves/m` when `convert_to_m: True`
-  - Size: `cm ÷ 100 = m` when `convert_to_m: True`
+
+### Fruit Generation
+
+The MeshGenerator supports procedural fruit (apple) generation using L-Py's built-in sphere primitive. Fruits are automatically generated on branches with realistic hanging physics and clustering behavior.
+
+#### Configuration Parameters
+
+All fruit generation parameters are defined in `Config/config.yaml`:
+
+```yaml
+parameters:
+  # Fruit Generation Parameters
+  fruit_generation: True             # Master toggle for fruit generation (apples)
+  fruit_density: [0.05, 0.03, 0.0]  # Fruits per cm for branch levels 1,2,3+
+                                     # Auto-converts to fruits/m if convert_to_m: True
+  fruit_radius: [6, 5, 0]           # Apple radius in cm for branch levels 1,2,3+
+                                     # Auto-converts to m if convert_to_m: True
+  fruit_color: [1.0, 0.0, 0.0]      # RGB color (0-1 range): [1,0,0]=red, [0,1,0]=green
+  fruit_start_ratio: 0.2             # Skip first 20% of branch (closer to trunk than leaves)
+  fruit_end_ratio: 0.8               # Stop at 80% of branch (fruits avoid branch tips)
+  fruit_spacing_variation: 0.3       # Randomness in fruit spacing (0=even, 1=fully random)
+  fruit_clustering: True             # Enable fruit clustering (multiple fruits per attachment point)
+  fruit_cluster_size: [1, 2]        # Number of fruits per cluster [min, max]
+  fruit_cluster_spread: 0.02         # Spatial spread of fruit cluster (in meters or cm based on convert_to_m)
+  fruit_hang_distance: 3             # Distance fruits hang below branch in cm
+                                     # Auto-converts to m if convert_to_m: True
+  fruit_obj: True                    # Save individual fruit OBJ files
+```
+
+#### Technical Details
+
+- **Module**: `fruit_generator.py` contains core fruit generation logic
+- **L-Py Integration**: Uses L-Py's `@O(radius)` sphere primitive with `SetColor(r,g,b)` color commands
+- **Fruit Selection**: Spaced point selection along branch arc length with configurable spacing variation
+- **Gravity Implementation**: Fruits offset downward in negative Z direction by `fruit_hang_distance` to simulate natural hanging
+- **Clustering Algorithm**: Random radial offsets within `cluster_spread` distance, with slight radius variation (95%-105%) per fruit
 
 ## NewBranchGenerator
 
@@ -248,6 +253,7 @@ After running the full generation pipeline (`python MeshGenerator.py -new_tree_m
     │       └── tree1/
     │           ├── branch/                      # Branch .lpy files
     │           ├── leaf/                        # Leaf .lpy files
+    │           ├── fruit/                       # Fruit .lpy files
     │           ├── trunk/                       # Trunk .lpy files
     │           └── tree1.lpy                    # Complete tree L-system
     ├── meta/                                    # Metadata
@@ -258,8 +264,31 @@ After running the full generation pipeline (`python MeshGenerator.py -new_tree_m
             └── tree1/
                 ├── branch/                      # Individual branch meshes
                 ├── leaf/                        # Individual leaf meshes
+                ├── fruit/                       # Individual fruit meshes
                 ├── trunk/                       # Trunk mesh
-                └── tree1.obj                    # Complete tree mesh
+                └── tree1.obj                    # Complete tree mesh (branches + leaves + fruits)
+```
+
+#### Individual Tree Output Structure
+
+```
+demo_output/
+└── obj/
+    └── new_tree_json/
+        └── tree1/
+            ├── branch/
+            │   ├── tree1_branch1.obj           # Only branch geometry
+            │   ├── tree1_branch2.obj
+            │   └── tree1_level2_branch1.obj    # Hierarchical branches
+            ├── leaf/
+            │   ├── tree1_leaf1.obj             # Only leaf geometry
+            │   ├── tree1_leaf2.obj
+            │   └── tree1_level2_leaf1.obj      # Hierarchical branch leaves
+            ├── fruit/
+            │   ├── tree1_fruit1.obj            # Only fruit geometry
+            │   ├── tree1_fruit2.obj
+            │   └── tree1_level2_fruit1.obj     # Hierarchical branch fruits
+            └── tree1.obj                        # Complete tree (branches + leaves + fruits)
 ```
 
 ## Utilities

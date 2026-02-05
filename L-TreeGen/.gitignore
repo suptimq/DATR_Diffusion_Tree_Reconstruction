@@ -1,2 +1,5 @@
 *.lpy~
 *.pyc
+demo_output/
+test*
+debug*

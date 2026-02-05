@@ -129,6 +129,98 @@ def generate_lpy_content_with_leaves(modules, points_list, radii_list, leaf_data
     return content
 
 
+def generate_lpy_content_with_leaves_and_fruits(modules, points_list, radii_list, leaf_data_list=None, fruit_data_list=None):
+    """
+    Generates L-system content with both leaf and fruit support.
+
+    Args:
+        modules (list): A list of L-system module names.
+        points_list (list): A list of lists of 3D points representing each structure.
+        radii_list (list): A list of lists of radii corresponding to each point.
+        leaf_data_list (list, optional): List of leaf data lists for each module.
+        fruit_data_list (list, optional): List of fruit data lists for each module.
+
+    Returns:
+        str: Generated L-system content with leaves and fruits.
+    """
+    # Join module names with a space
+    module_line = "module " + ", ".join(modules)
+
+    content = f"{module_line}\n"
+
+    # Join module names with their corresponding SectionResolution commands
+    axiom_line = "Axiom: " + " ".join(
+        [f"SectionResolution(30) {module}()" for module in modules]
+    )
+
+    content += f"{axiom_line}\n"
+    content += "derivation length: 1\n"
+    content += "production:\n"
+
+    # Iterate over modules, points, radii, and optional leaf/fruit data
+    for idx, (module, points, radii) in enumerate(zip(modules, points_list, radii_list)):
+        # Get leaf data for this module (if available)
+        leaf_data = []
+        if leaf_data_list and idx < len(leaf_data_list) and leaf_data_list[idx]:
+            leaf_data = leaf_data_list[idx]
+
+        # Get fruit data for this module (if available)
+        fruit_data = []
+        if fruit_data_list and idx < len(fruit_data_list) and fruit_data_list[idx]:
+            fruit_data = fruit_data_list[idx]
+
+        # Generate branch content
+        content += f"""
+{module}():
+    x, y, z = {points[0]}
+    r = {radii[0]}
+    nproduce !(r) MoveTo(x, y, z)
+    nproduce @Gc
+    for point, radius in zip({points[1:]}, {radii[1:]}):
+        x, y, z = point
+        nproduce !(radius) LineTo(x, y, z)
+    nproduce @Ge
+"""
+
+        # Add leaves if available
+        if leaf_data:
+            for leaf in leaf_data:
+                pos = leaf['position']
+                pitch = leaf['pitch_angle']
+                rotation = leaf['rotation_angle']
+                size = leaf['size']
+                content += f"""    nproduce [
+    nproduce MoveTo({pos[0]}, {pos[1]}, {pos[2]})
+    nproduce ;(2)
+    nproduce ^({pitch})
+    nproduce +({rotation})
+    nproduce ~l({size})
+    nproduce ]
+"""
+
+        # Add fruits if available
+        if fruit_data:
+            for fruit in fruit_data:
+                pos = fruit['position']
+                radius = fruit['radius']
+                color = fruit['color']
+                # Convert color from 0-1 range to 0-255 range for L-Py
+                color_r = int(color[0] * 255)
+                color_g = int(color[1] * 255)
+                color_b = int(color[2] * 255)
+                content += f"""    nproduce [
+    nproduce MoveTo({pos[0]}, {pos[1]}, {pos[2]})
+    nproduce SetColor({color_r}, {color_g}, {color_b})
+    nproduce @O({radius})
+    nproduce ]
+"""
+
+    content += "interpretation:\n"
+    content += "endlsystem"
+
+    return content
+
+
 def generate_leaf_only_lpy_content(module_name, leaf_data_list):
     """
     Generates L-system content with ONLY leaves (no branch geometry).
@@ -162,6 +254,50 @@ def generate_leaf_only_lpy_content(module_name, leaf_data_list):
     nproduce ^({pitch})
     nproduce +({rotation})
     nproduce ~l({size})
+    nproduce ]
+"""
+
+    content += "interpretation:\n"
+    content += "endlsystem"
+
+    return content
+
+
+def generate_fruit_only_lpy_content(module_name, fruit_data_list):
+    """
+    Generates L-system content with ONLY fruits (no branch geometry).
+
+    Args:
+        module_name (str): Name for the fruit module (e.g., "Fruit1")
+        fruit_data_list (list): List of fruit data dicts with:
+            - 'position': [x,y,z]
+            - 'radius': float (fruit radius)
+            - 'color': [r,g,b] (RGB color 0-1 range)
+
+    Returns:
+        str: L-system content with only fruit geometry (spheres)
+    """
+    content = f"module {module_name}\n"
+    content += f"Axiom: {module_name}()\n"
+    content += "derivation length: 1\n"
+    content += "production:\n"
+    content += f"\n{module_name}():\n"
+
+    # Generate fruits without any branch geometry
+    for fruit in fruit_data_list:
+        pos = fruit['position']
+        radius = fruit['radius']
+        color = fruit['color']
+
+        # Convert color from 0-1 range to 0-255 range for L-Py
+        color_r = int(color[0] * 255)
+        color_g = int(color[1] * 255)
+        color_b = int(color[2] * 255)
+
+        content += f"""    nproduce [
+    nproduce MoveTo({pos[0]}, {pos[1]}, {pos[2]})
+    nproduce SetColor({color_r}, {color_g}, {color_b})
+    nproduce @O({radius})
     nproduce ]
 """
 

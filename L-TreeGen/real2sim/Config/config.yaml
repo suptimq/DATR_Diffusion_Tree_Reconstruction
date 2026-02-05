@@ -83,5 +83,19 @@ parameters: {
   leaf_phyllotaxis_angle: 137.5,     # Spiral angle between leaves (golden angle)
   leaf_start_ratio: 0.1,             # Skip first 10% of branch (near trunk)
   leaf_end_ratio: 0.95,              # Stop at 95% of branch (before tip)
-  leaf_obj: True,                   # Save individual leaf OBJ files (debug)
+  leaf_obj: True,                    # Save individual leaf OBJ files (debug)
+
+  # Fruit Generation Parameters
+  fruit_generation: True,            # Master toggle for fruit generation (apples)
+  fruit_density: [0.05, 0.03, 0.0],  # Fruits per cm for levels 1,2,3+ (auto-converts to fruits/m if convert_to_m=True)
+  fruit_radius: [6, 5, 0],           # Apple radius in cm for levels 1,2,3+ (auto-converts to m if convert_to_m=True)
+  fruit_color: [1.0, 0.0, 0.0],      # RGB color (0-1 range): [1,0,0]=red, [0,1,0]=green
+  fruit_start_ratio: 0.2,            # Skip first 20% of branch (closer to trunk than leaves)
+  fruit_end_ratio: 0.8,              # Stop at 80% of branch (fruits avoid branch tips)
+  fruit_spacing_variation: 0.3,      # Randomness in fruit spacing (0=even, 1=fully random)
+  fruit_clustering: True,            # Enable fruit clustering (multiple fruits per attachment point)
+  fruit_cluster_size: [1, 2],        # Number of fruits per cluster [min, max]
+  fruit_cluster_spread: 0.02,        # Spatial spread of fruit cluster (in meters or cm based on convert_to_m)
+  fruit_hang_distance: 3,            # Distance fruits hang below branch in cm (auto-converts to m if convert_to_m=True)
+  fruit_obj: True,                   # Save individual fruit OBJ files
 }
